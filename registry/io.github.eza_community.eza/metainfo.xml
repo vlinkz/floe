@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>io.github.eza_community.eza</id>
+  <name>eza</name>
+  <summary>A modern alternative to ls</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>EUPL-1.2</project_license>
+  <description>
+    <p>
+      eza is a modern replacement for the venerable file-listing
+      command-line program ls that ships with Unix and Linux operating
+      systems, giving it more features and better defaults.
+    </p>
+  </description>
+  <url type="homepage">https://eza.rocks/</url>
+  <url type="bugtracker">https://github.com/eza-community/eza/issues</url>
+  <url type="vcs-browser">https://github.com/eza-community/eza</url>
+  <provides>
+    <binary>eza</binary>
+  </provides>
+  <developer id="io.github.eza_community">
+    <name>eza contributors</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+</component>

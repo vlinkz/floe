@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "nilla": {
+    "url": "https://github.com/nilla-nix/cli/archive/7bd8639687567e3629471d952b6b732691c0890b.tar.gz",
+    "hash": "sha256-lNxeYMSLTbe/yp4ElIujaP1bB0BfhGLt+6xgV2XWUtE="
+  },
+  "systems": [
+    "x86_64-linux",
+    "aarch64-linux"
+  ],
+  "attr": "packages.nilla-cli.result.{system}",
+  "mainProgram": "nilla"
+}

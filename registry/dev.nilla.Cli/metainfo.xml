@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="console-application">
+  <id>dev.nilla.Cli</id>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>Nilla CLI</name>
+  <summary>Work with Nilla projects with ease</summary>
+  <description>
+    <p>
+      Work with Nilla projects with ease. Nilla projects manage your
+      packages, development shells, systems, and more.
+    </p>
+  </description>
+  <url type="homepage">https://nilla.dev</url>
+  <url type="bugtracker">https://github.com/nilla-nix/cli/issues</url>
+  <url type="vcs-browser">https://github.com/nilla-nix/cli</url>
+  <provides>
+    <binary>nilla</binary>
+  </provides>
+  <developer id="dev.nilla">
+    <name>Nilla project</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+</component>

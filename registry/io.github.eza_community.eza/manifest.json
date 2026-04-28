@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "flake": {
+    "url": "github:eza-community/eza",
+    "rev": "eed27ed05e74542af5852aed40e3dbff87d69c43"
+  },
+  "systems": [
+    "x86_64-linux"
+  ],
+  "attr": "packages.{system}.default",
+  "mainProgram": "eza"
+}

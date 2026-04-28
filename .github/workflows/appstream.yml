@@ -1,0 +1,256 @@
+name: AppStream
+
+# Combine per-app slices into one catalog package per system.
+
+on:
+  workflow_run:
+    workflows: ["Build"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      systems:
+        description: "Comma-separated systems to aggregate (default: all known)"
+        required: false
+        default: ""
+
+concurrency:
+  group: appstream-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    name: Aggregate AppStream catalog
+    # Skip workflow_run when upstream Build failed.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [x86_64-linux, aarch64-linux]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Filter dispatched systems
+        id: filter
+        if: github.event_name == 'workflow_dispatch' && inputs.systems != ''
+        env:
+          SYSTEMS: ${{ inputs.systems }}
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          if [[ ",$SYSTEMS," == *",$SYSTEM,"* ]]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::system $SYSTEM not requested; skipping"
+          fi
+
+      - name: Install Lix
+        if: steps.filter.outputs.skip != 'true'
+        uses: canidae-solutions/lix-quick-install-action@main
+
+      - name: Cache Nix store
+        if: steps.filter.outputs.skip != 'true'
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-appstream-${{ matrix.system }}-${{ hashFiles('flake.lock', 'npins/sources.json', 'builder/Cargo.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-appstream-${{ matrix.system }}-
+
+      - name: Check for AppStream S3 credentials
+        id: appstream
+        if: steps.filter.outputs.skip != 'true'
+        shell: bash
+        env:
+          S3_KEY_ID: ${{ secrets.FLOE_APPSTREAM_S3_KEY_ID }}
+          S3_SECRET: ${{ secrets.FLOE_APPSTREAM_S3_SECRET }}
+          S3_ENDPOINT: ${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}
+          S3_BUCKET: ${{ vars.FLOE_APPSTREAM_BUCKET }}
+        run: |
+          if [[ -n "${S3_KEY_ID:-}" && -n "${S3_SECRET:-}" && -n "${S3_ENDPOINT:-}" && -n "${S3_BUCKET:-}" ]]; then
+            echo "have_credentials=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_credentials=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::missing S3 credentials; cannot fetch slices for ${{ matrix.system }}"
+          fi
+
+      - name: Download slices from S3
+        if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.FLOE_APPSTREAM_S3_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.FLOE_APPSTREAM_S3_SECRET }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+        run: |
+          mkdir -p "var/appstream/${{ matrix.system }}"
+          nix shell nixpkgs#awscli2 -c aws s3 sync \
+            --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
+            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/" \
+            "var/appstream/${{ matrix.system }}/" \
+            --no-progress
+
+      - name: Run aggregator
+        if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
+        run: |
+          mkdir -p var/aggregated/${{ matrix.system }}/floe-appstream-data
+          nix run .#floe-builder -- \
+            aggregate \
+              --system "${{ matrix.system }}" \
+              --slices-dir var/appstream \
+              --out-dir var/aggregated/${{ matrix.system }}/floe-appstream-data
+
+      - name: Pack catalog tarball
+        id: catalog
+        if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
+        run: |
+          set -euo pipefail
+          src="var/aggregated/${{ matrix.system }}/floe-appstream-data"
+          generated_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Filename-safe stamp: strip colons.
+          stamp="$(date -u -d "$generated_iso" +%Y%m%dT%H%M%SZ)"
+          tarball="floe-appstream-data-${stamp}.tar.gz"
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+              --mtime='@0' --format=gnu \
+              -C "$src" -czf "$tarball" .
+          hash="$(nix hash file --type sha256 --sri "$tarball")"
+          {
+            echo "tarball=$tarball"
+            echo "stamp=$stamp"
+            echo "generated=$generated_iso"
+            echo "hash=$hash"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Skip if catalog unchanged
+        id: changed
+        if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
+        env:
+          NEW_HASH: ${{ steps.catalog.outputs.hash }}
+        run: |
+          set -euo pipefail
+          record="appstream/${{ matrix.system }}.json"
+          if [[ -f "$record" ]]; then
+            old_hash=$(nix shell nixpkgs#jq -c jq -r '.hash // ""' < "$record")
+          else
+            old_hash=""
+          fi
+          if [[ -n "$old_hash" && "$old_hash" == "$NEW_HASH" ]]; then
+            echo "::notice::catalog hash unchanged ($old_hash); skipping upload and commit"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload tarball to S3
+        if: >-
+          steps.filter.outputs.skip != 'true'
+          && steps.appstream.outputs.have_credentials == 'true'
+          && steps.changed.outputs.changed == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.FLOE_APPSTREAM_S3_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.FLOE_APPSTREAM_S3_SECRET }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+        run: |
+          nix shell nixpkgs#awscli2 -c aws s3 cp \
+            --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
+            "${{ steps.catalog.outputs.tarball }}" \
+            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/${{ steps.catalog.outputs.tarball }}" \
+            --no-progress
+
+      - name: Write appstream/<system>.json record
+        if: >-
+          steps.filter.outputs.skip != 'true'
+          && steps.appstream.outputs.have_credentials == 'true'
+          && steps.changed.outputs.changed == 'true'
+        env:
+          GENERATED: ${{ steps.catalog.outputs.generated }}
+          HASH: ${{ steps.catalog.outputs.hash }}
+          TARBALL: ${{ steps.catalog.outputs.tarball }}
+        run: |
+          mkdir -p appstream
+          url="https://appstream.floepkgs.org/${{ matrix.system }}/${TARBALL}"
+          tmp="$(mktemp)"
+          # shellcheck disable=SC2016
+          nix shell nixpkgs#jq -c jq -n \
+            --arg system "${{ matrix.system }}" \
+            --arg url "$url" \
+            --arg hash "$HASH" \
+            --arg generated "$GENERATED" \
+            '{schemaVersion: 2, system: $system, url: $url, hash: $hash, generated: $generated}' \
+            > "$tmp"
+          mv "$tmp" "appstream/${{ matrix.system }}.json"
+
+      - name: Upload record artifact
+        if: >-
+          steps.filter.outputs.skip != 'true'
+          && steps.appstream.outputs.have_credentials == 'true'
+          && steps.changed.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: appstream-record-${{ matrix.system }}
+          path: appstream/${{ matrix.system }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  collect:
+    name: Commit AppStream records
+    needs: aggregate
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download all records
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Materialize records under appstream/
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          mkdir -p appstream
+          any=0
+          for art in artifacts/appstream-record-*; do
+            base="$(basename "$art")"
+            sys="${base#appstream-record-}"
+            if [[ -z "$sys" ]]; then
+              echo "::warning::cannot infer system from artifact name $base; skipping"
+              continue
+            fi
+            cp "$art/${sys}.json" "appstream/${sys}.json"
+            any=1
+          done
+          if [[ $any -eq 0 ]]; then
+            echo "No records to commit."
+          fi
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appstream/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "ci: refresh AppStream catalog records
+
+          Triggered by ${{ github.sha }}."
+          git pull --rebase origin main
+          git push origin main

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "flake": {
+    "url": "github:PrismLauncher/PrismLauncher",
+    "rev": "9a9e8573aaac3b7b49d79aa0d0544b7913e4d84f"
+  },
+  "systems": [
+    "x86_64-linux"
+  ],
+  "attr": "packages.{system}.prismlauncher",
+  "mainProgram": "prismlauncher"
+}

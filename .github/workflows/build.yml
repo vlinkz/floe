@@ -1,0 +1,274 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'registry/**'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+    inputs:
+      rebuild_all:
+        description: 'Rebuild every app in the registry'
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    name: Discover matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      empty: ${{ steps.matrix.outputs.empty }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Install Lix
+        uses: canidae-solutions/lix-quick-install-action@main
+
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-setup-${{ hashFiles('flake.lock', 'npins/sources.json', 'builder/Cargo.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-setup-
+
+      - name: Compute matrix
+        id: matrix
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REBUILD_ALL: ${{ github.event_name == 'workflow_dispatch' && inputs.rebuild_all }}
+        run: |
+          set -euo pipefail
+
+          # Full rebuild on workflow_dispatch or first commit; otherwise diff registry/.
+          full_rebuild=false
+          changed_apps=()
+
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            full_rebuild=true
+          elif ! git rev-parse HEAD~1 >/dev/null 2>&1; then
+            full_rebuild=true
+          else
+            changed=$(git diff --name-only HEAD~1 HEAD)
+            # The workflow file itself: rebuild everything to validate.
+            if echo "$changed" | grep -qE '^\.github/workflows/build\.yml$'; then
+              full_rebuild=true
+            else
+              # Map registry/<id>/... paths to <id>.
+              while IFS= read -r path; do
+                case "$path" in
+                  registry/*/*)
+                    id="${path#registry/}"
+                    id="${id%%/*}"
+                    changed_apps+=("$id")
+                    ;;
+                esac
+              done <<< "$changed"
+            fi
+          fi
+
+          # Pull the full matrix from the builder.
+          full=$(nix run .#floe-builder -- list)
+
+          if [[ "$full_rebuild" == "true" ]]; then
+            matrix="$full"
+          else
+            # Deduplicate and JSON-encode the changed-app set.
+            apps_json=$(printf '%s\n' "${changed_apps[@]}" | sort -u | jq -R . | jq -s .)
+            matrix=$(echo "$full" | jq --argjson apps "$apps_json" '[.[] | select(.app as $a | $apps | index($a))]')
+          fi
+
+          count=$(echo "$matrix" | jq 'length')
+          echo "Matrix entries: $count"
+          echo "$matrix" | jq
+
+          # Emit a flag so the build job can be skipped cleanly when nothing changed.
+          if [[ "$count" == "0" ]]; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+          # GHA matrix `include` expects an array of objects.
+          echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.app }} (${{ matrix.system }})
+    needs: setup
+    if: needs.setup.outputs.empty == 'false'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    runs-on: >-
+      ${{ matrix.system == 'aarch64-linux' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Lix
+        uses: canidae-solutions/lix-quick-install-action@main
+
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-build-${{ matrix.system }}-${{ hashFiles('flake.lock', 'npins/sources.json', 'builder/Cargo.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-build-${{ matrix.system }}-
+
+      - name: Check for cache token
+        id: cache
+        env:
+          CACHE_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
+        run: |
+          if [[ -n "${CACHE_TOKEN:-}" ]]; then
+            echo "have_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_token=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Attic
+        if: steps.cache.outputs.have_token == 'true'
+        env:
+          ATTIC_ENDPOINT: ${{ vars.FLOE_CACHE_ENDPOINT }}
+          ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
+          ATTIC_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
+        run: |
+          nix profile install nixpkgs#attic-client
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
+          attic use "$ATTIC_CACHE"
+
+      - name: Build shard
+        id: build
+        run: |
+          nix run .#floe-builder -- \
+            build --app "${{ matrix.app }}" --system "${{ matrix.system }}"
+          store_path=$(nix shell nixpkgs#jq -c jq -r .storePath \
+            < "builds/${{ matrix.app }}/${{ matrix.system }}.json")
+          echo "store_path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - name: Push closure to Attic
+        if: steps.cache.outputs.have_token == 'true'
+        env:
+          ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
+          STORE_PATH: ${{ steps.build.outputs.store_path }}
+        run: |
+          attic push "$ATTIC_CACHE" "$STORE_PATH"
+
+      - name: Check for AppStream S3 credentials
+        id: appstream
+        shell: bash
+        env:
+          S3_KEY_ID: ${{ secrets.FLOE_APPSTREAM_S3_KEY_ID }}
+          S3_SECRET: ${{ secrets.FLOE_APPSTREAM_S3_SECRET }}
+          S3_ENDPOINT: ${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}
+          S3_BUCKET: ${{ vars.FLOE_APPSTREAM_BUCKET }}
+        run: |
+          if [[ -n "${S3_KEY_ID:-}" && -n "${S3_SECRET:-}" && -n "${S3_ENDPOINT:-}" && -n "${S3_BUCKET:-}" ]]; then
+            echo "have_credentials=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_credentials=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload AppStream slice
+        if: steps.cache.outputs.have_token == 'true' && steps.appstream.outputs.have_credentials == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.FLOE_APPSTREAM_S3_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.FLOE_APPSTREAM_S3_SECRET }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: true
+          ENDPOINT: ${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}
+          BUCKET: ${{ vars.FLOE_APPSTREAM_BUCKET }}
+          SYSTEM: ${{ matrix.system }}
+        run: |
+          src="var/appstream/${SYSTEM}"
+          nix shell nixpkgs#awscli2 -c aws s3 cp \
+            --recursive \
+            --endpoint-url "$ENDPOINT" \
+            "$src/" \
+            "s3://${BUCKET}/${SYSTEM}/" \
+            --no-progress
+
+      - name: Upload shard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.app }}-${{ matrix.system }}
+          path: builds/${{ matrix.app }}/${{ matrix.system }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+  collect:
+    name: Commit shards
+    needs:
+      - setup
+      - build
+    # Run even if some matrix entries failed; commit whatever shards succeeded.
+    if: ${{ always() && needs.setup.outputs.empty == 'false' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download all shards
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Materialize shards under builds/
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          any=0
+          for art in artifacts/shard-*; do
+            # Artifact name is `shard-<app>-<sys>`; recover both for placement.
+            base="$(basename "$art")"
+            rest="${base#shard-}"
+            sys=""
+            for candidate in x86_64-linux aarch64-linux; do
+              if [[ "$rest" == *"-$candidate" ]]; then
+                sys="$candidate"
+                break
+              fi
+            done
+            if [[ -z "$sys" ]]; then
+              echo "::warning::cannot infer system from artifact name $base; skipping"
+              continue
+            fi
+            suffix="-$sys"
+            app="${rest%"$suffix"}"
+            mkdir -p "builds/$app"
+            cp "$art/$sys.json" "builds/$app/$sys.json"
+            any=1
+          done
+          if [[ $any -eq 0 ]]; then
+            echo "No shards to commit."
+          fi
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "ci: refresh build shards
+
+          Triggered by ${{ github.sha }}."
+          # Rebase in case another run pushed in the meantime, then push.
+          git pull --rebase origin main
+          git push origin main

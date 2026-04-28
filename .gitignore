@@ -1,0 +1,4 @@
+/result*
+/builder/target/
+/.direnv
+/var

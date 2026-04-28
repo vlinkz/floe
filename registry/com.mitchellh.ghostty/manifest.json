@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "flake": {
+    "url": "github:ghostty-org/ghostty",
+    "rev": "332b2aefc6e72d363aa93ab6ecfc86eeeeb5ed28"
+  },
+  "systems": [
+    "x86_64-linux",
+    "aarch64-linux"
+  ],
+  "attr": "packages.{system}.ghostty",
+  "mainProgram": "ghostty"
+}
