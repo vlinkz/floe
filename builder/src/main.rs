@@ -33,11 +33,19 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Print a JSON list of `(app, system)` pairs declared in the registry.
-    List,
+    List(ListArgs),
     /// Build one `(app, system)` pair, or every pair with `--all`.
     Build(BuildArgs),
     /// Combine per-app AppStream slices into one catalog for a single system.
     Aggregate(AggregateArgs),
+}
+
+#[derive(Debug, Args)]
+struct ListArgs {
+    /// Only emit pairs whose committed build record is missing or stale
+    /// (source rev/hash, version override, attr, or mainProgram changed).
+    #[arg(long)]
+    outdated: bool,
 }
 
 #[derive(Debug, Args)]
@@ -87,7 +95,7 @@ fn main() -> Result<()> {
     let ctx = Ctx::new(repo_root, cli.publish_dir);
 
     match cli.command {
-        Command::List => run_list(&ctx),
+        Command::List(args) => run_list(&ctx, args.outdated),
         Command::Build(args) => {
             if args.all {
                 run_build_all(&ctx, args.system.as_deref())

@@ -60,54 +60,20 @@ jobs:
         id: matrix
         shell: bash
         env:
-          EVENT: ${{ github.event_name }}
           REBUILD_ALL: ${{ github.event_name == 'workflow_dispatch' && inputs.rebuild_all }}
         run: |
           set -euo pipefail
 
-          # Full rebuild on workflow_dispatch or first commit; otherwise diff registry/.
-          full_rebuild=false
-          changed_apps=()
-
-          if [[ "$EVENT" == "workflow_dispatch" ]]; then
-            full_rebuild=true
-          elif ! git rev-parse HEAD~1 >/dev/null 2>&1; then
-            full_rebuild=true
+          if [[ "$REBUILD_ALL" == "true" ]]; then
+            matrix=$(nix run .#floe-builder -- list)
           else
-            changed=$(git diff --name-only HEAD~1 HEAD)
-            # The workflow file itself: rebuild everything to validate.
-            if echo "$changed" | grep -qE '^\.github/workflows/build\.yml$'; then
-              full_rebuild=true
-            else
-              # Map registry/<id>/... paths to <id>.
-              while IFS= read -r path; do
-                case "$path" in
-                  registry/*/*)
-                    id="${path#registry/}"
-                    id="${id%%/*}"
-                    changed_apps+=("$id")
-                    ;;
-                esac
-              done <<< "$changed"
-            fi
-          fi
-
-          # Pull the full matrix from the builder.
-          full=$(nix run .#floe-builder -- list)
-
-          if [[ "$full_rebuild" == "true" ]]; then
-            matrix="$full"
-          else
-            # Deduplicate and JSON-encode the changed-app set.
-            apps_json=$(printf '%s\n' "${changed_apps[@]}" | sort -u | jq -R . | jq -s .)
-            matrix=$(echo "$full" | jq --argjson apps "$apps_json" '[.[] | select(.app as $a | $apps | index($a))]')
+            matrix=$(nix run .#floe-builder -- list --outdated)
           fi
 
           count=$(echo "$matrix" | jq 'length')
           echo "Matrix entries: $count"
           echo "$matrix" | jq
 
-          # Emit a flag so the build job can be skipped cleanly when nothing changed.
           if [[ "$count" == "0" ]]; then
             echo "empty=true" >> "$GITHUB_OUTPUT"
           else
