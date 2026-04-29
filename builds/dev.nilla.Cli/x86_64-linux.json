@@ -19,8 +19,8 @@
   "attr": "packages.nilla-cli.result.x86_64-linux",
   "version": "0.0.0-alpha.12",
   "storePath": "/nix/store/gc2pf2layv8lrwmki3bvc6l3rhim8fsr-nilla-0.0.0-alpha.12",
-  "narHash": "sha256-GmBZIhfrcStP+EGd4dy2vzE7l9dsjn3KVbcNJxYTWMk=",
-  "closureSize": 2029530480,
+  "narHash": "sha256-n0vksmnMZs3YTNPWDlDJuVRXhbpPPZC/g06RxginDG8=",
+  "closureSize": 2029530456,
   "unfree": false,
-  "generated": "2026-04-29T02:04:02Z"
+  "generated": "2026-04-29T03:23:27Z"
 }
