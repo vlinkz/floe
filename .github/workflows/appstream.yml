@@ -60,7 +60,7 @@ jobs:
       - name: Set up CI tools
         if: steps.filter.outputs.skip != 'true'
         run: |
-          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          path="$(nix-shell nix/shells/ci.nix --run 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
       - name: Check for cache token
@@ -135,7 +135,7 @@ jobs:
         if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
         run: |
           mkdir -p var/aggregated/${{ matrix.system }}/floe-appstream-data
-          nix run .#floe-builder -- \
+          floe-builder \
             appstream aggregate \
               --system "${{ matrix.system }}" \
               --slices-dir var/appstream \

@@ -59,30 +59,8 @@
 
       devShells = forBuilderSystems (
         _system: pkgs: {
-          default = pkgs.mkShell {
-            packages = with pkgs; [
-              cargo
-              rustc
-              rustfmt
-              clippy
-              rust-analyzer
-              jq
-              appstream
-              librsvg
-              pkg-config
-              rustPlatform.bindgenHook
-              glib
-            ];
-            RUST_BACKTRACE = "1";
-            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-          };
-          ci = pkgs.mkShell {
-            packages = with pkgs; [
-              attic-client
-              awscli2
-              jq
-            ];
-          };
+          default = import ./nix/shells/default.nix { inherit pkgs; };
+          ci = import ./nix/shells/ci.nix { inherit pkgs; };
         }
       );
     };

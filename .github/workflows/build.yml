@@ -36,7 +36,7 @@ jobs:
 
       - name: Set up CI tools
         run: |
-          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          path="$(nix-shell nix/shells/ci.nix --run 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
       - name: Refresh main
@@ -86,9 +86,9 @@ jobs:
           set -euo pipefail
 
           if [[ "$REBUILD_ALL" == "true" ]]; then
-            matrix=$(nix run .#floe-builder -- list)
+            matrix=$(floe-builder list)
           else
-            matrix=$(nix run .#floe-builder -- list --outdated)
+            matrix=$(floe-builder list --outdated)
           fi
 
           count=$(echo "$matrix" | jq 'length')
@@ -140,7 +140,7 @@ jobs:
 
       - name: Set up CI tools
         run: |
-          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          path="$(nix-shell nix/shells/ci.nix --run 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
       - name: Check for cache token
@@ -180,7 +180,7 @@ jobs:
         env:
           FLOE_APPSTREAM_BASE_URL: ${{ vars.FLOE_APPSTREAM_BASE_URL }}
         run: |
-          nix run .#floe-builder -- \
+          floe-builder \
             build --app "${{ matrix.app }}" --system "${{ matrix.system }}"
 
       - name: Push new store paths to Attic

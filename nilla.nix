@@ -64,14 +64,33 @@ let
 
   packages =
     appPackages // (if catalogSystems == [ ] then { } else { floe-appstream-data = appstreamEntry; });
+
+  builderSystems = [
+    "x86_64-linux"
+    "aarch64-linux"
+  ];
+
+  shellEntry = file: {
+    systems = builderSystems;
+    builder = "nixpkgs";
+    shell = { pkgs }: import file { inherit pkgs; };
+    settings.args = { };
+  };
+
+  shells = {
+    default = shellEntry ./nix/shells/default.nix;
+    ci = shellEntry ./nix/shells/ci.nix;
+  };
+
+  inputSystems = unique (allSystems ++ builderSystems);
 in
 nilla.create {
   config = {
     inputs.nixpkgs = {
       src = pins.nixos-unstable;
-      settings.systems = allSystems;
+      settings.systems = inputSystems;
     };
 
-    inherit packages;
+    inherit packages shells;
   };
 }

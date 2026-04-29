@@ -49,7 +49,7 @@ jobs:
       - name: Set up CI tools
         if: steps.filter.outputs.skip != 'true'
         run: |
-          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          path="$(nix-shell nix/shells/ci.nix --run 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
       - name: Check for cache token
@@ -109,7 +109,7 @@ jobs:
           SYSTEM: ${{ matrix.system }}
           FLOE_APPSTREAM_BASE_URL: ${{ vars.FLOE_APPSTREAM_BASE_URL }}
         run: |
-          nix run .#floe-builder -- appstream regenerate --system "$SYSTEM"
+          floe-builder appstream regenerate --system "$SYSTEM"
 
       - name: Upload slices to S3
         if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
