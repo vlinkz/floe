@@ -18,9 +18,20 @@
   },
   "attr": "packages.nilla-cli.result.x86_64-linux",
   "version": "0.0.0-alpha.12",
-  "storePath": "/nix/store/gc2pf2layv8lrwmki3bvc6l3rhim8fsr-nilla-0.0.0-alpha.12",
-  "narHash": "sha256-n0vksmnMZs3YTNPWDlDJuVRXhbpPPZC/g06RxginDG8=",
-  "closureSize": 2029530456,
+  "storePath": "/nix/store/ykzlq2caja33zxh54gkqpvz08c011rcq-floe-trim",
+  "narHash": "sha256-be4rXnxTWLv3BR1dc22mZNvYIFk0B7iex8/IIOBbbYU=",
+  "closureSize": 35881352,
   "unfree": false,
-  "generated": "2026-04-29T03:23:27Z"
+  "upstream": {
+    "storePath": "/nix/store/gc2pf2layv8lrwmki3bvc6l3rhim8fsr-nilla-0.0.0-alpha.12",
+    "narHash": "sha256-n0vksmnMZs3YTNPWDlDJuVRXhbpPPZC/g06RxginDG8=",
+    "closureSize": 2029530456
+  },
+  "wrappers": {
+    "trim": [
+      "scrub-toolchain:rust",
+      "strip-binaries"
+    ]
+  },
+  "generated": "2026-04-29T07:07:21Z"
 }

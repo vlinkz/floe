@@ -18,9 +18,20 @@
   },
   "attr": "packages.x86_64-linux.default",
   "version": "git",
-  "storePath": "/nix/store/6gividh9yxbpqcc0y8n3fjib99lad7n1-eza-git",
-  "narHash": "sha256-oRzlqyRTVj+gVZ8K1deKfMT2+2V4+EdvLaVnZMXgUc8=",
-  "closureSize": 1309391160,
+  "storePath": "/nix/store/3cnvv63jh95azbzrpgw6b20s9yk09rfh-floe-trim",
+  "narHash": "sha256-UyBkQxZZhsHMzC6WnFhLFr5jFWEw6KM5yOMzPA9ACKs=",
+  "closureSize": 46301888,
   "unfree": false,
-  "generated": "2026-04-29T03:19:16Z"
+  "upstream": {
+    "storePath": "/nix/store/6gividh9yxbpqcc0y8n3fjib99lad7n1-eza-git",
+    "narHash": "sha256-oRzlqyRTVj+gVZ8K1deKfMT2+2V4+EdvLaVnZMXgUc8=",
+    "closureSize": 1309391160
+  },
+  "wrappers": {
+    "trim": [
+      "scrub-toolchain:rust",
+      "strip-binaries"
+    ]
+  },
+  "generated": "2026-04-29T07:05:30Z"
 }
