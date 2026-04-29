@@ -8,5 +8,8 @@
     "x86_64-linux"
   ],
   "attr": "packages.{system}.default",
-  "mainProgram": "eza"
+  "mainProgram": "eza",
+  "wrappers": {
+    "trim": true
+  }
 }

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -23,7 +24,19 @@ pub struct SystemRecord {
     pub closure_size: u64,
     #[serde(default)]
     pub unfree: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream: Option<UpstreamRecord>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub wrappers: BTreeMap<String, Vec<String>>,
     pub generated: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpstreamRecord {
+    pub store_path: String,
+    pub nar_hash: String,
+    pub closure_size: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

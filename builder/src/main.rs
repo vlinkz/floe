@@ -12,6 +12,7 @@ mod manifest;
 mod nix;
 mod pipeline;
 mod source;
+mod wrappers;
 
 use crate::pipeline::{Ctx, run_aggregate, run_build, run_build_all, run_list, run_regenerate};
 

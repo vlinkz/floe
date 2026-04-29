@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -5,10 +6,13 @@ use chrono::Utc;
 use tracing::{info, info_span, warn};
 
 use crate::appstream;
-use crate::build_json::{AppDir, AppMetadata, BUILD_JSON_SCHEMA_VERSION, SystemRecord};
+use crate::build_json::{
+    AppDir, AppMetadata, BUILD_JSON_SCHEMA_VERSION, SystemRecord, UpstreamRecord,
+};
 use crate::manifest::{Manifest, ManifestPath};
 use crate::nix;
-use crate::source;
+use crate::source::{self, BuildOutput};
+use crate::wrappers::{self, NixpkgsPin, Trim, Wrapper, WrapperContext};
 
 use super::{Ctx, discover_manifests};
 
@@ -98,7 +102,7 @@ pub fn run_build(ctx: &Ctx, app_id: &str, system: &str) -> Result<()> {
         );
     }
 
-    let info = nix::path_info(&output.store_path)?;
+    let upstream_info = nix::path_info(&output.store_path)?;
     let version = manifest
         .version
         .clone()
@@ -106,6 +110,9 @@ pub fn run_build(ctx: &Ctx, app_id: &str, system: &str) -> Result<()> {
         .unwrap_or_else(|| "unknown".to_owned());
 
     let metadata = run_appstream(ctx, &manifest_path, &output.store_path, system)?;
+
+    let outcome = run_wrappers(ctx, &manifest, &output, system, &upstream_info)
+        .with_context(|| format!("wrappers for {app_id}"))?;
 
     let shard = SystemRecord {
         schema_version: BUILD_JSON_SCHEMA_VERSION,
@@ -116,10 +123,12 @@ pub fn run_build(ctx: &Ctx, app_id: &str, system: &str) -> Result<()> {
         metadata,
         attr: output.attr,
         version,
-        store_path: output.store_path,
-        nar_hash: info.nar_hash,
-        closure_size: info.closure_size,
+        store_path: outcome.store_path,
+        nar_hash: outcome.path_info.nar_hash,
+        closure_size: outcome.path_info.closure_size,
         unfree: output.unfree,
+        upstream: outcome.upstream,
+        wrappers: outcome.ops,
         generated: now_iso8601(),
     };
     shard.write_to(&ctx.builds_dir)?;
@@ -128,6 +137,86 @@ pub fn run_build(ctx: &Ctx, app_id: &str, system: &str) -> Result<()> {
         "wrote system shard"
     );
     Ok(())
+}
+
+struct WrapperOutcome {
+    store_path: String,
+    path_info: nix::PathInfo,
+    upstream: Option<UpstreamRecord>,
+    ops: BTreeMap<String, Vec<String>>,
+}
+
+fn run_wrappers(
+    ctx: &Ctx,
+    manifest: &Manifest,
+    upstream: &BuildOutput,
+    system: &str,
+    upstream_info: &nix::PathInfo,
+) -> Result<WrapperOutcome> {
+    if manifest.wrappers.is_empty() {
+        return Ok(WrapperOutcome {
+            store_path: upstream.store_path.clone(),
+            path_info: upstream_info.clone(),
+            upstream: None,
+            ops: BTreeMap::new(),
+        });
+    }
+
+    let nixpkgs =
+        NixpkgsPin::load(&ctx.repo_root).context("loading nixpkgs pin for wrapper derivations")?;
+
+    let mut current = upstream.clone();
+    let mut ops_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+    if let Some(cfg) = manifest.wrappers.trim.as_ref() {
+        let result = run_one(
+            &Trim,
+            &current,
+            &manifest.main_program,
+            system,
+            &nixpkgs,
+            cfg,
+        )?;
+        ops_map.insert(Trim::NAME.to_owned(), result.ops);
+        current = BuildOutput {
+            attr: current.attr,
+            store_path: result.store_path,
+            unfree: current.unfree,
+            version: current.version,
+        };
+    }
+
+    let final_info = nix::path_info(&current.store_path)?;
+    info!(
+        upstream_size = upstream_info.closure_size,
+        wrapped_size = final_info.closure_size,
+        wrappers = ?ops_map.keys().collect::<Vec<_>>(),
+        "wrappers complete"
+    );
+
+    Ok(WrapperOutcome {
+        store_path: current.store_path,
+        path_info: final_info,
+        upstream: Some(UpstreamRecord {
+            store_path: upstream.store_path.clone(),
+            nar_hash: upstream_info.nar_hash.clone(),
+            closure_size: upstream_info.closure_size,
+        }),
+        ops: ops_map,
+    })
+}
+
+fn run_one<W: Wrapper>(
+    wrapper: &W,
+    upstream: &BuildOutput,
+    main_program: &str,
+    system: &str,
+    nixpkgs: &NixpkgsPin,
+    cfg: &W::Config,
+) -> Result<wrappers::WrapperResult> {
+    info!(wrapper = W::NAME, "applying wrapper");
+    let ctx = WrapperContext::new(upstream, main_program, system, nixpkgs)?;
+    wrappers::apply(wrapper, &ctx, cfg)
 }
 
 fn run_appstream(

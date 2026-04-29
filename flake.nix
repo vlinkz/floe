@@ -4,14 +4,14 @@
     extra-trusted-public-keys = [ "floe:EFpHpRyPQiuT+GepNk8DuL+pNB8JlWRiNk6uSAJ3Uuk=" ];
   };
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  };
-
   outputs =
-    { self, nixpkgs }:
+    { self }:
     let
-      inherit (nixpkgs) lib;
+      # Use npins as the source of truth for nixpkgs revision
+      sources = import ./npins;
+      nixpkgs = sources.nixos-unstable;
+      pkgsFor = system: import nixpkgs { inherit system; };
+      lib = (pkgsFor "x86_64-linux").lib;
 
       buildsDir = ./builds;
       appstreamDir = ./appstream;
@@ -29,15 +29,14 @@
 
       appSystems = lib.unique (builtins.concatMap (id: systemsForApp id) (builtins.attrNames appDirs));
 
-      forAppSystems = f: lib.genAttrs appSystems (system: f system nixpkgs.legacyPackages.${system});
+      forAppSystems = f: lib.genAttrs appSystems (system: f system (pkgsFor system));
 
       builderSystems = [
         "x86_64-linux"
         "aarch64-linux"
       ];
 
-      forBuilderSystems =
-        f: lib.genAttrs builderSystems (system: f system nixpkgs.legacyPackages.${system});
+      forBuilderSystems = f: lib.genAttrs builderSystems (system: f system (pkgsFor system));
     in
     {
       packages = forAppSystems (

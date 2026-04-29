@@ -53,7 +53,10 @@ fn needs_build(ctx: &Ctx, app_id: &str, system: &str, manifest: &Manifest) -> bo
     {
         return true;
     }
-    !source_matches(&record.source, manifest)
+    if !source_matches(&record.source, manifest) {
+        return true;
+    }
+    manifest.wrappers.is_empty() == record.upstream.is_some()
 }
 
 fn source_matches(record: &Source, manifest: &Manifest) -> bool {

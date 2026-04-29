@@ -9,5 +9,8 @@
     "aarch64-linux"
   ],
   "attr": "packages.nilla-cli.result.{system}",
-  "mainProgram": "nilla"
+  "mainProgram": "nilla",
+  "wrappers": {
+    "trim": true
+  }
 }

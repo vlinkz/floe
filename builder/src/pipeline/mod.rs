@@ -16,6 +16,7 @@ pub use list::run_list;
 pub use regenerate::run_regenerate;
 
 pub struct Ctx {
+    pub repo_root: PathBuf,
     pub registry_dir: PathBuf,
     pub builds_dir: PathBuf,
     pub publish_dir: PathBuf,
@@ -25,11 +26,16 @@ pub struct Ctx {
 impl Ctx {
     pub fn new(repo_root: PathBuf, publish_dir: Option<PathBuf>) -> Self {
         let var_dir = repo_root.join("var");
+        let registry_dir = repo_root.join("registry");
+        let builds_dir = repo_root.join("builds");
+        let publish_dir = publish_dir.unwrap_or_else(|| var_dir.join("appstream"));
+        let staging_dir = var_dir.join("staging").join("appstream");
         Self {
-            registry_dir: repo_root.join("registry"),
-            builds_dir: repo_root.join("builds"),
-            publish_dir: publish_dir.unwrap_or_else(|| var_dir.join("appstream")),
-            staging_dir: var_dir.join("staging").join("appstream"),
+            repo_root,
+            registry_dir,
+            builds_dir,
+            publish_dir,
+            staging_dir,
         }
     }
 }

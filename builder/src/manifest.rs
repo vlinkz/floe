@@ -20,6 +20,64 @@ pub struct Manifest {
     pub systems: Vec<String>,
     pub attr: String,
     pub main_program: String,
+    #[serde(default, skip_serializing_if = "WrappersConfig::is_empty")]
+    pub wrappers: WrappersConfig,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WrappersConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trim: Option<TrimConfig>,
+}
+
+impl WrappersConfig {
+    pub fn is_empty(&self) -> bool {
+        self.trim.is_none()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", try_from = "TrimRaw")]
+pub struct TrimConfig {
+    pub strip: bool,
+    pub scrub_toolchain: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum TrimRaw {
+    Bool(bool),
+    Object {
+        #[serde(default = "default_true", rename = "strip")]
+        strip: bool,
+        #[serde(default = "default_true", rename = "scrubToolchain")]
+        scrub_toolchain: bool,
+    },
+}
+
+impl TryFrom<TrimRaw> for TrimConfig {
+    type Error = &'static str;
+    fn try_from(raw: TrimRaw) -> Result<Self, Self::Error> {
+        match raw {
+            TrimRaw::Bool(true) => Ok(Self {
+                strip: true,
+                scrub_toolchain: true,
+            }),
+            TrimRaw::Bool(false) => Err("'trim': false is redundant; omit the field instead"),
+            TrimRaw::Object {
+                strip,
+                scrub_toolchain,
+            } => Ok(Self {
+                strip,
+                scrub_toolchain,
+            }),
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
