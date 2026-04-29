@@ -33,11 +33,28 @@ jobs:
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
 
-      - name: Cache Nix store
-        uses: nix-community/cache-nix-action@v7
-        with:
-          primary-key: nix-${{ runner.os }}-setup-${{ hashFiles('flake.lock', 'npins/sources.json', 'builder/Cargo.lock') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-setup-
+      - name: Check for cache token
+        id: cache
+        env:
+          CACHE_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
+        run: |
+          if [[ -n "${CACHE_TOKEN:-}" ]]; then
+            echo "have_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_token=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Attic
+        if: steps.cache.outputs.have_token == 'true'
+        env:
+          ATTIC_ENDPOINT: ${{ vars.FLOE_CACHE_ENDPOINT }}
+          ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
+          ATTIC_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
+        run: |
+          nix profile install nixpkgs#attic-client
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
+          attic use "$ATTIC_CACHE"
 
       - name: Compute matrix
         id: matrix
@@ -115,12 +132,6 @@ jobs:
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
 
-      - name: Cache Nix store
-        uses: nix-community/cache-nix-action@v7
-        with:
-          primary-key: nix-${{ runner.os }}-build-${{ matrix.system }}-${{ hashFiles('flake.lock', 'npins/sources.json', 'builder/Cargo.lock') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-build-${{ matrix.system }}-
-
       - name: Check for cache token
         id: cache
         env:
@@ -144,22 +155,31 @@ jobs:
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           attic use "$ATTIC_CACHE"
 
+      - name: Snapshot store
+        id: pre
+        run: |
+          nix path-info --all > "$RUNNER_TEMP/store-before.txt"
+          echo "before=$RUNNER_TEMP/store-before.txt" >> "$GITHUB_OUTPUT"
+
       - name: Build app
-        id: build
         run: |
           nix run .#floe-builder -- \
             build --app "${{ matrix.app }}" --system "${{ matrix.system }}"
-          store_path=$(nix shell nixpkgs#jq -c jq -r .storePath \
-            < "builds/${{ matrix.app }}/${{ matrix.system }}.json")
-          echo "store_path=$store_path" >> "$GITHUB_OUTPUT"
 
-      - name: Push closure to Attic
+      - name: Push new store paths to Attic
         if: steps.cache.outputs.have_token == 'true'
         env:
           ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
-          STORE_PATH: ${{ steps.build.outputs.store_path }}
+          BEFORE: ${{ steps.pre.outputs.before }}
         run: |
-          attic push "$ATTIC_CACHE" "$STORE_PATH"
+          set -euo pipefail
+          new=$(comm -23 <(nix path-info --all | sort -u) <(sort -u "$BEFORE"))
+          if [[ -z "$new" ]]; then
+            echo "No new store paths to push."
+            exit 0
+          fi
+          # shellcheck disable=SC2086
+          attic push "$ATTIC_CACHE" $new
 
       - name: Check for AppStream S3 credentials
         id: appstream
