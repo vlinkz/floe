@@ -33,6 +33,11 @@ jobs:
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
 
+      - name: Set up CI tools
+        run: |
+          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          echo "PATH=$path" >> "$GITHUB_ENV"
+
       - name: Check for cache token
         id: cache
         env:
@@ -53,8 +58,6 @@ jobs:
           CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
           CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
-          nix profile install nixpkgs#attic-client
-          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           mkdir -p ~/.config/nix
           {
@@ -125,6 +128,11 @@ jobs:
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
 
+      - name: Set up CI tools
+        run: |
+          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          echo "PATH=$path" >> "$GITHUB_ENV"
+
       - name: Check for cache token
         id: cache
         env:
@@ -145,8 +153,6 @@ jobs:
           CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
           CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
-          nix profile install nixpkgs#attic-client
-          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           mkdir -p ~/.config/nix
           {
@@ -209,7 +215,7 @@ jobs:
           SYSTEM: ${{ matrix.system }}
         run: |
           src="var/appstream/${SYSTEM}"
-          nix shell nixpkgs#awscli2 -c aws s3 cp \
+          aws s3 cp \
             --recursive \
             --endpoint-url "$ENDPOINT" \
             "$src/" \

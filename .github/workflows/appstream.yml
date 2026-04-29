@@ -57,6 +57,12 @@ jobs:
         if: steps.filter.outputs.skip != 'true'
         uses: canidae-solutions/lix-quick-install-action@main
 
+      - name: Set up CI tools
+        if: steps.filter.outputs.skip != 'true'
+        run: |
+          path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
+          echo "PATH=$path" >> "$GITHUB_ENV"
+
       - name: Check for cache token
         id: cache
         if: steps.filter.outputs.skip != 'true'
@@ -78,8 +84,6 @@ jobs:
           CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
           CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
-          nix profile install nixpkgs#attic-client
-          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           mkdir -p ~/.config/nix
           {
@@ -120,7 +124,7 @@ jobs:
           AWS_EC2_METADATA_DISABLED: true
         run: |
           mkdir -p "var/appstream/${{ matrix.system }}"
-          nix shell nixpkgs#awscli2 -c aws s3 sync \
+          aws s3 sync \
             --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
             --exclude "catalogs/*" \
             "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/" \
@@ -168,8 +172,8 @@ jobs:
           set -euo pipefail
           record="appstream/${SYSTEM}.json"
           if [[ -f "$record" ]]; then
-            old_hash=$(nix shell nixpkgs#jq -c jq -r '.hash // ""' < "$record")
-            old_url=$(nix shell nixpkgs#jq -c jq -r '.url // ""' < "$record")
+            old_hash=$(jq -r '.hash // ""' < "$record")
+            old_url=$(jq -r '.url // ""' < "$record")
           else
             old_hash=""
             old_url=""
@@ -193,7 +197,7 @@ jobs:
           AWS_DEFAULT_REGION: auto
           AWS_EC2_METADATA_DISABLED: true
         run: |
-          nix shell nixpkgs#awscli2 -c aws s3 cp \
+          aws s3 cp \
             --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
             "${{ steps.catalog.outputs.tarball }}" \
             "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/catalogs/${{ steps.catalog.outputs.tarball }}" \
@@ -213,7 +217,7 @@ jobs:
           url="https://appstream.floepkgs.org/${{ matrix.system }}/catalogs/${TARBALL}"
           tmp="$(mktemp)"
           # shellcheck disable=SC2016
-          nix shell nixpkgs#jq -c jq -n \
+          jq -n \
             --arg system "${{ matrix.system }}" \
             --arg url "$url" \
             --arg hash "$HASH" \
