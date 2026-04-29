@@ -13,7 +13,7 @@ mod nix;
 mod pipeline;
 mod source;
 
-use crate::pipeline::{Ctx, run_aggregate, run_build, run_build_all, run_list};
+use crate::pipeline::{Ctx, run_aggregate, run_build, run_build_all, run_list, run_regenerate};
 
 #[derive(Debug, Parser)]
 #[command(version, about)]
@@ -36,6 +36,15 @@ enum Command {
     List(ListArgs),
     /// Build one `(app, system)` pair, or every pair with `--all`.
     Build(BuildArgs),
+    /// AppStream operations on existing build records.
+    #[command(subcommand)]
+    Appstream(AppstreamCommand),
+}
+
+#[derive(Debug, Subcommand)]
+enum AppstreamCommand {
+    /// Regenerate per-app AppStream slices from existing build records.
+    Regenerate(RegenerateArgs),
     /// Combine per-app AppStream slices into one catalog for a single system.
     Aggregate(AggregateArgs),
 }
@@ -64,6 +73,17 @@ struct BuildArgs {
     app: Option<String>,
 
     /// Target system to build for.
+    #[arg(long)]
+    system: Option<String>,
+}
+
+#[derive(Debug, Args)]
+struct RegenerateArgs {
+    /// AppStream component id. If omitted, regenerate every app.
+    #[arg(long)]
+    app: Option<String>,
+
+    /// Target system. If omitted, regenerate every system.
     #[arg(long)]
     system: Option<String>,
 }
@@ -105,10 +125,15 @@ fn main() -> Result<()> {
                 run_build(&ctx, &app, &system)
             }
         }
-        Command::Aggregate(args) => {
-            let slices_dir = args.slices_dir.unwrap_or_else(|| ctx.publish_dir.clone());
-            run_aggregate(slices_dir, args.out_dir, &args.system)
-        }
+        Command::Appstream(cmd) => match cmd {
+            AppstreamCommand::Regenerate(args) => {
+                run_regenerate(&ctx, args.app.as_deref(), args.system.as_deref())
+            }
+            AppstreamCommand::Aggregate(args) => {
+                let slices_dir = args.slices_dir.unwrap_or_else(|| ctx.publish_dir.clone());
+                run_aggregate(slices_dir, args.out_dir, &args.system)
+            }
+        },
     }
 }
 

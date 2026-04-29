@@ -125,7 +125,7 @@ jobs:
         run: |
           mkdir -p var/aggregated/${{ matrix.system }}/floe-appstream-data
           nix run .#floe-builder -- \
-            aggregate \
+            appstream aggregate \
               --system "${{ matrix.system }}" \
               --slices-dir var/appstream \
               --out-dir var/aggregated/${{ matrix.system }}/floe-appstream-data

@@ -8,10 +8,12 @@ use crate::manifest::ManifestPath;
 pub mod aggregate;
 pub mod build_one;
 pub mod list;
+pub mod regenerate;
 
 pub use aggregate::run_aggregate;
 pub use build_one::{run_build, run_build_all};
 pub use list::run_list;
+pub use regenerate::run_regenerate;
 
 pub struct Ctx {
     pub registry_dir: PathBuf,
