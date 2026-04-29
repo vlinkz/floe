@@ -57,6 +57,20 @@ jobs:
         if: steps.filter.outputs.skip != 'true'
         uses: canidae-solutions/lix-quick-install-action@main
 
+      - name: Configure binary cache
+        if: steps.filter.outputs.skip != 'true'
+        env:
+          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
+          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
+        run: |
+          if [[ -n "${CACHE_PUBLIC_URL:-}" && -n "${CACHE_PUBLIC_KEY:-}" ]]; then
+            mkdir -p ~/.config/nix
+            {
+              echo "extra-substituters = $CACHE_PUBLIC_URL"
+              echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
+            } >> ~/.config/nix/nix.conf
+          fi
+
       - name: Set up CI tools
         if: steps.filter.outputs.skip != 'true'
         run: |
@@ -79,21 +93,14 @@ jobs:
             echo "have_token=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Set up Attic
+      - name: Attic login
         if: steps.filter.outputs.skip != 'true' && steps.cache.outputs.have_token == 'true'
         env:
           ATTIC_ENDPOINT: ${{ vars.FLOE_CACHE_ENDPOINT }}
           ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
           ATTIC_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
-          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
-          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
-          mkdir -p ~/.config/nix
-          {
-            echo "extra-substituters = $CACHE_PUBLIC_URL"
-            echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
-          } >> ~/.config/nix/nix.conf
 
       - name: Snapshot store
         id: pre

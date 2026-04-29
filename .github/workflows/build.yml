@@ -34,8 +34,24 @@ jobs:
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
 
+      - name: Configure binary cache
+        env:
+          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
+          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
+        run: |
+          if [[ -n "${CACHE_PUBLIC_URL:-}" && -n "${CACHE_PUBLIC_KEY:-}" ]]; then
+            mkdir -p ~/.config/nix
+            {
+              echo "extra-substituters = $CACHE_PUBLIC_URL"
+              echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
+            } >> ~/.config/nix/nix.conf
+          fi
+
       - name: Set up CI tools
         run: |
+          # Point NIX_PATH at the npins-pinned nixpkgs so `nix-shell`
+          # doesn't fall back to the public registry when synthesizing
+          # `bashInteractive`. The shell itself reads npins explicitly.
           nixpkgs="$(nix-instantiate --eval --strict \
             -E '(import ./npins).nixos-unstable.outPath' | tr -d '"')"
           echo "NIX_PATH=nixpkgs=$nixpkgs" >> "$GITHUB_ENV"
@@ -59,21 +75,14 @@ jobs:
             echo "have_token=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Set up Attic
+      - name: Attic login
         if: steps.cache.outputs.have_token == 'true'
         env:
           ATTIC_ENDPOINT: ${{ vars.FLOE_CACHE_ENDPOINT }}
           ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
           ATTIC_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
-          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
-          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
-          mkdir -p ~/.config/nix
-          {
-            echo "extra-substituters = $CACHE_PUBLIC_URL"
-            echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
-          } >> ~/.config/nix/nix.conf
 
       - name: Snapshot store
         id: pre
@@ -142,13 +151,25 @@ jobs:
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
 
+      - name: Configure binary cache
+        env:
+          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
+          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
+        run: |
+          if [[ -n "${CACHE_PUBLIC_URL:-}" && -n "${CACHE_PUBLIC_KEY:-}" ]]; then
+            mkdir -p ~/.config/nix
+            {
+              echo "extra-substituters = $CACHE_PUBLIC_URL"
+              echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
+            } >> ~/.config/nix/nix.conf
+          fi
+
       - name: Set up CI tools
         run: |
           nixpkgs="$(nix-instantiate --eval --strict \
             -E '(import ./npins).nixos-unstable.outPath' | tr -d '"')"
           echo "NIX_PATH=nixpkgs=$nixpkgs" >> "$GITHUB_ENV"
           export NIX_PATH="nixpkgs=$nixpkgs"
-
           path="$(nix-shell nix/shells/ci.nix --run 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
@@ -163,21 +184,14 @@ jobs:
             echo "have_token=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Set up Attic
+      - name: Attic login
         if: steps.cache.outputs.have_token == 'true'
         env:
           ATTIC_ENDPOINT: ${{ vars.FLOE_CACHE_ENDPOINT }}
           ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
           ATTIC_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
-          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
-          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
-          mkdir -p ~/.config/nix
-          {
-            echo "extra-substituters = $CACHE_PUBLIC_URL"
-            echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
-          } >> ~/.config/nix/nix.conf
 
       - name: Snapshot store
         id: pre
