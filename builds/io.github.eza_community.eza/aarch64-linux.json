@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "appId": "io.github.eza_community.eza",
+  "mainProgram": "eza",
+  "system": "aarch64-linux",
+  "source": {
+    "kind": "flake",
+    "url": "github:eza-community/eza",
+    "lockedUrl": "github:eza-community/eza/eed27ed05e74542af5852aed40e3dbff87d69c43?narHash=sha256-3rvPP%2BmwW/9wK5BmcFVZh8tXb0tiT8DEwRXFYtSqXco%3D",
+    "lockedRev": "eed27ed05e74542af5852aed40e3dbff87d69c43"
+  },
+  "metadata": {
+    "componentType": "console-application",
+    "summary": "A modern alternative to ls",
+    "longDescription": "eza is a modern replacement for the venerable file-listing command-line program ls that ships with Unix and Linux operating systems, giving it more features and better defaults.",
+    "homepage": "https://eza.rocks/",
+    "license": "EUPL-1.2"
+  },
+  "attr": "packages.aarch64-linux.default",
+  "version": "git",
+  "storePath": "/nix/store/s6lqjgml6blz8z7hq90m0i8hhrx7nh20-floe-trim",
+  "narHash": "sha256-qea9Zv84qYPUQT1DPT00Ua21kUWq48zAzcgarco1jI8=",
+  "closureSize": 57057112,
+  "unfree": false,
+  "upstream": {
+    "storePath": "/nix/store/ppz2vl3mvvzkx5mxbm49d129xm4vs9yw-eza-git",
+    "narHash": "sha256-PneAHDnN+ynL0xQ6h1a3gKkLFaSZEfxYubHS/VQjPZA=",
+    "closureSize": 1187622312
+  },
+  "wrappers": {
+    "trim": [
+      "scrub-toolchain:rust",
+      "strip-binaries"
+    ]
+  },
+  "generated": "2026-04-29T08:32:24Z"
+}
