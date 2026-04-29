@@ -47,9 +47,22 @@ pub fn run(slices_dir: &Path, out_dir: &Path, system: &str) -> Result<AggregateR
     let mut components_xml = String::new();
     let mut report = AggregateReport::default();
     let mut errors: Vec<String> = Vec::new();
+    let mut media_baseurl: Option<String> = None;
     for entry in entries {
         match ingest_slice(&entry, &icons_root, &icons_origin_dir) {
             Ok(slice) => {
+                if let Some(url) = slice.media_baseurl {
+                    match &media_baseurl {
+                        None => media_baseurl = Some(url),
+                        Some(existing) if existing != &url => {
+                            errors.push(format!(
+                                "{}: media_baseurl mismatch (slice={url:?}, prior={existing:?})",
+                                entry.path.display()
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
                 components_xml.push_str(&slice.body);
                 report.apps.push(slice.app_id);
                 report.icons += slice.icons_copied;
@@ -69,7 +82,7 @@ pub fn run(slices_dir: &Path, out_dir: &Path, system: &str) -> Result<AggregateR
         );
     }
 
-    let catalog = compose_catalog(&components_xml);
+    let catalog = compose_catalog(&components_xml, media_baseurl.as_deref());
     let catalog_path = xml_out_dir.join(catalog_filename(system));
     write_gzipped(&catalog_path, catalog.as_bytes())
         .with_context(|| format!("writing {}", catalog_path.display()))?;
@@ -133,6 +146,7 @@ struct IngestedSlice {
     app_id: String,
     body: String,
     icons_copied: usize,
+    media_baseurl: Option<String>,
 }
 
 fn ingest_slice(
@@ -144,6 +158,7 @@ fn ingest_slice(
     let xml = std::str::from_utf8(&raw)
         .with_context(|| format!("{} is not valid UTF-8", entry.path.display()))?;
 
+    let media_baseurl = extract_components_attr(xml, "media_baseurl");
     let inner = extract_components_inner(xml)
         .with_context(|| format!("parsing {}", entry.path.display()))?;
     let component = extract_first_component(inner)
@@ -180,6 +195,7 @@ fn ingest_slice(
     }
 
     let mut body = String::new();
+    body.push_str("  ");
     body.push_str(rewritten.trim());
     body.push('\n');
 
@@ -187,7 +203,18 @@ fn ingest_slice(
         app_id: entry.app_id.clone(),
         body,
         icons_copied,
+        media_baseurl,
     })
+}
+
+fn extract_components_attr(xml: &str, name: &str) -> Option<String> {
+    let start = xml.find("<components")?;
+    let close = xml[start..].find('>')? + start;
+    let head = &xml[start..close];
+    let needle = format!("{name}=\"");
+    let attr_start = head.find(&needle)? + needle.len();
+    let attr_end = head[attr_start..].find('"')? + attr_start;
+    Some(head[attr_start..attr_end].to_owned())
 }
 
 fn read_maybe_gzip(path: &Path, gzipped: bool) -> Result<Vec<u8>> {
@@ -374,18 +401,30 @@ fn sanitize_filename(raw: &str) -> Option<&str> {
 }
 
 /// Final catalog XML; no timestamp so identical inputs produce identical bytes.
-fn compose_catalog(components_inner: &str) -> String {
+fn compose_catalog(components_inner: &str, media_baseurl: Option<&str>) -> String {
     let mut out = String::new();
     out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     out.push_str(&format!(
-        "<components version=\"1.0\" origin=\"{COMBINED_ORIGIN}\">\n"
+        "<components version=\"1.0\" origin=\"{COMBINED_ORIGIN}\""
     ));
-    if !components_inner.trim().is_empty() {
-        out.push_str(components_inner.trim());
+    if let Some(url) = media_baseurl {
+        out.push_str(&format!(" media_baseurl=\"{}\"", xml_escape(url)));
+    }
+    out.push_str(">\n");
+    let trimmed = components_inner.trim_end();
+    if !trimmed.is_empty() {
+        out.push_str(trimmed);
         out.push('\n');
     }
     out.push_str("</components>\n");
     out
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// Gzip-compress with `mtime=0` so output is bit-stable.
