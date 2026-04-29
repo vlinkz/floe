@@ -131,7 +131,7 @@ fn recompose_appstream(
         .with_context(|| format!("creating {}", arch_publish.display()))?;
 
     let staged = appstream::stage_app(app_id, &closure, &metainfo, &arch_staging)?;
-    appstream::compose(app_id, &staged, &arch_publish)?;
+    appstream::compose(app_id, system, &staged, &arch_publish)?;
 
     Ok(AppMetadata {
         component_type: metainfo.extracted.kind,

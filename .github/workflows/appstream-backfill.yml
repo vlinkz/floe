@@ -97,6 +97,7 @@ jobs:
         if: steps.filter.outputs.skip != 'true'
         env:
           SYSTEM: ${{ matrix.system }}
+          FLOE_APPSTREAM_BASE_URL: ${{ vars.FLOE_APPSTREAM_BASE_URL }}
         run: |
           nix run .#floe-builder -- appstream regenerate --system "$SYSTEM"
 

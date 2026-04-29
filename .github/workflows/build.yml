@@ -149,6 +149,8 @@ jobs:
           echo "before=$RUNNER_TEMP/store-before.txt" >> "$GITHUB_OUTPUT"
 
       - name: Build app
+        env:
+          FLOE_APPSTREAM_BASE_URL: ${{ vars.FLOE_APPSTREAM_BASE_URL }}
         run: |
           nix run .#floe-builder -- \
             build --app "${{ matrix.app }}" --system "${{ matrix.system }}"

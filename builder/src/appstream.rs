@@ -232,7 +232,12 @@ fn symlink_tree(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn compose(app_id: &str, staged_app_root: &Path, publish_dir: &Path) -> Result<()> {
+pub fn compose(
+    app_id: &str,
+    system: &str,
+    staged_app_root: &Path,
+    publish_dir: &Path,
+) -> Result<()> {
     info!("composing AppStream catalog");
 
     let data_dir = publish_dir.join("xmls");
@@ -241,14 +246,25 @@ pub fn compose(app_id: &str, staged_app_root: &Path, publish_dir: &Path) -> Resu
         std::fs::create_dir_all(d).with_context(|| format!("creating {}", d.display()))?;
     }
 
-    let status = Command::new(appstreamcli_path())
-        .arg("compose")
+    let mut cmd = Command::new(appstreamcli_path());
+    cmd.arg("compose")
         .arg("--prefix=/")
         .arg(format!("--origin={app_id}"))
         .arg(format!("--result-root={}", publish_dir.display()))
         .arg(format!("--data-dir={}", data_dir.display()))
         .arg(format!("--icons-dir={}", icons_dir.display()))
-        .arg(format!("--components={app_id}"))
+        .arg(format!("--components={app_id}"));
+
+    if let Ok(base) = std::env::var("FLOE_APPSTREAM_BASE_URL") {
+        let media_dir = publish_dir.join("media");
+        std::fs::create_dir_all(&media_dir)
+            .with_context(|| format!("creating {}", media_dir.display()))?;
+        let base = base.trim_end_matches('/');
+        cmd.arg(format!("--media-dir={}", media_dir.display()))
+            .arg(format!("--media-baseurl={base}/{system}/media"));
+    }
+
+    let status = cmd
         .arg(staged_app_root)
         .stderr(Stdio::inherit())
         .stdout(Stdio::inherit())

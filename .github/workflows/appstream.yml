@@ -116,6 +116,7 @@ jobs:
           mkdir -p "var/appstream/${{ matrix.system }}"
           nix shell nixpkgs#awscli2 -c aws s3 sync \
             --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
+            --exclude "catalogs/*" \
             "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/" \
             "var/appstream/${{ matrix.system }}/" \
             --no-progress
@@ -156,16 +157,20 @@ jobs:
         if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
         env:
           NEW_HASH: ${{ steps.catalog.outputs.hash }}
+          SYSTEM: ${{ matrix.system }}
         run: |
           set -euo pipefail
-          record="appstream/${{ matrix.system }}.json"
+          record="appstream/${SYSTEM}.json"
           if [[ -f "$record" ]]; then
             old_hash=$(nix shell nixpkgs#jq -c jq -r '.hash // ""' < "$record")
+            old_url=$(nix shell nixpkgs#jq -c jq -r '.url // ""' < "$record")
           else
             old_hash=""
+            old_url=""
           fi
-          if [[ -n "$old_hash" && "$old_hash" == "$NEW_HASH" ]]; then
-            echo "::notice::catalog hash unchanged ($old_hash); skipping upload and commit"
+          expected_prefix="https://appstream.floepkgs.org/${SYSTEM}/catalogs/"
+          if [[ -n "$old_hash" && "$old_hash" == "$NEW_HASH" && "$old_url" == "$expected_prefix"* ]]; then
+            echo "::notice::catalog unchanged ($old_hash); skipping upload and commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -185,7 +190,7 @@ jobs:
           nix shell nixpkgs#awscli2 -c aws s3 cp \
             --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
             "${{ steps.catalog.outputs.tarball }}" \
-            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/${{ steps.catalog.outputs.tarball }}" \
+            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/catalogs/${{ steps.catalog.outputs.tarball }}" \
             --no-progress
 
       - name: Write appstream/<system>.json record
@@ -199,7 +204,7 @@ jobs:
           TARBALL: ${{ steps.catalog.outputs.tarball }}
         run: |
           mkdir -p appstream
-          url="https://appstream.floepkgs.org/${{ matrix.system }}/${TARBALL}"
+          url="https://appstream.floepkgs.org/${{ matrix.system }}/catalogs/${TARBALL}"
           tmp="$(mktemp)"
           # shellcheck disable=SC2016
           nix shell nixpkgs#jq -c jq -n \
