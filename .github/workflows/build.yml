@@ -28,7 +28,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          ref: main
+          fetch-depth: 0
 
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
@@ -37,6 +38,11 @@ jobs:
         run: |
           path="$(nix develop .#ci --command bash -c 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
+
+      - name: Refresh main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
 
       - name: Check for cache token
         id: cache
@@ -124,6 +130,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Match `setup`'s view of main so the build sees whatever
+          # state matrix discovery resolved against (registry + builds).
+          ref: main
 
       - name: Install Lix
         uses: canidae-solutions/lix-quick-install-action@main
