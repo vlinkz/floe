@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "system": "x86_64-linux",
   "url": "https://appstream.floepkgs.org/x86_64-linux/floe-appstream-data-20260429T070938Z.tar.gz",
   "hash": "sha256-lGxTG4No11j3bfugjXxOHr7dtpNaSDc3iFlhFpd/Xjw=",

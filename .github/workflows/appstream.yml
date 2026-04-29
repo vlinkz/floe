@@ -207,7 +207,7 @@ jobs:
             --arg url "$url" \
             --arg hash "$HASH" \
             --arg generated "$GENERATED" \
-            '{schemaVersion: 2, system: $system, url: $url, hash: $hash, generated: $generated}' \
+            '{schemaVersion: 1, system: $system, url: $url, hash: $hash, generated: $generated}' \
             > "$tmp"
           mv "$tmp" "appstream/${{ matrix.system }}.json"
 
