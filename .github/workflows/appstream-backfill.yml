@@ -49,6 +49,10 @@ jobs:
       - name: Set up CI tools
         if: steps.filter.outputs.skip != 'true'
         run: |
+          nixpkgs="$(nix-instantiate --eval --strict \
+            -E '(import ./npins).nixos-unstable.outPath' | tr -d '"')"
+          echo "NIX_PATH=nixpkgs=$nixpkgs" >> "$GITHUB_ENV"
+          export NIX_PATH="nixpkgs=$nixpkgs"
           path="$(nix-shell nix/shells/ci.nix --run 'echo "$PATH"')"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
