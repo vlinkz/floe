@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "system": "aarch64-linux",
-  "url": "https://appstream.floepkgs.org/aarch64-linux/catalogs/floe-appstream-data-20260429T083629Z.tar.gz",
-  "hash": "sha256-BkEfBQAANdVRsO8DvHu6SXsPxMAwtT4iHLpdbSvSt1o=",
-  "generated": "2026-04-29T08:36:29Z"
+  "url": "https://appstream.floepkgs.org/aarch64-linux/catalogs/floe-appstream-data-20260429T085340Z.tar.gz",
+  "hash": "sha256-8VWBVkcHSJfNtQKRvLiGFz3YRz+FFKulp3dMyjz5P2Y=",
+  "generated": "2026-04-29T08:53:40Z"
 }
