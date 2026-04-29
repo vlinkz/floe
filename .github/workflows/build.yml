@@ -144,7 +144,7 @@ jobs:
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           attic use "$ATTIC_CACHE"
 
-      - name: Build shard
+      - name: Build app
         id: build
         run: |
           nix run .#floe-builder -- \
@@ -195,20 +195,20 @@ jobs:
             "s3://${BUCKET}/${SYSTEM}/" \
             --no-progress
 
-      - name: Upload shard artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: shard-${{ matrix.app }}-${{ matrix.system }}
+          name: build-${{ matrix.app }}-${{ matrix.system }}
           path: builds/${{ matrix.app }}/${{ matrix.system }}.json
           if-no-files-found: error
           retention-days: 7
 
   collect:
-    name: Commit shards
+    name: Commit builds
     needs:
       - setup
       - build
-    # Run even if some matrix entries failed; commit whatever shards succeeded.
+    # Run even if some matrix entries failed; commit whatever builds succeeded.
     if: ${{ always() && needs.setup.outputs.empty == 'false' }}
     runs-on: ubuntu-24.04
     permissions:
@@ -220,21 +220,21 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Download all shards
+      - name: Download all builds
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
-      - name: Materialize shards under builds/
+      - name: Materialize builds
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
           any=0
-          for art in artifacts/shard-*; do
-            # Artifact name is `shard-<app>-<sys>`; recover both for placement.
+          for art in artifacts/build-*; do
+            # Artifact name is `build-<app>-<sys>`; recover both for placement.
             base="$(basename "$art")"
-            rest="${base#shard-}"
+            rest="${base#build-}"
             sys=""
             for candidate in x86_64-linux aarch64-linux; do
               if [[ "$rest" == *"-$candidate" ]]; then
@@ -253,7 +253,7 @@ jobs:
             any=1
           done
           if [[ $any -eq 0 ]]; then
-            echo "No shards to commit."
+            echo "No builds to commit."
           fi
 
       - name: Commit and push
@@ -266,7 +266,7 @@ jobs:
             echo "No changes to commit."
             exit 0
           fi
-          git commit -m "ci: refresh build shards
+          git commit -m "ci: refresh builds
 
           Triggered by ${{ github.sha }}."
           # Rebase in case another run pushed in the meantime, then push.
