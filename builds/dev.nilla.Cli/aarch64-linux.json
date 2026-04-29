@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "appId": "dev.nilla.Cli",
+  "mainProgram": "nilla",
+  "system": "aarch64-linux",
+  "source": {
+    "kind": "nilla",
+    "url": "https://github.com/nilla-nix/cli/archive/7bd8639687567e3629471d952b6b732691c0890b.tar.gz",
+    "hash": "sha256-lNxeYMSLTbe/yp4ElIujaP1bB0BfhGLt+6xgV2XWUtE=",
+    "projectFile": "nilla.nix"
+  },
+  "metadata": {
+    "componentType": "console-application",
+    "summary": "Work with Nilla projects with ease",
+    "longDescription": "Work with Nilla projects with ease. Nilla projects manage your packages, development shells, systems, and more.",
+    "homepage": "https://nilla.dev",
+    "license": "Apache-2.0"
+  },
+  "attr": "packages.nilla-cli.result.aarch64-linux",
+  "version": "0.0.0-alpha.12",
+  "storePath": "/nix/store/lnx286a9dspn9f7pjfgc6fy8sx48giy9-nilla-0.0.0-alpha.12",
+  "narHash": "sha256-JnRCv2CAuZe2YNuXO7b4Vod/FvL3L+p5b6HtQ3qpI1c=",
+  "closureSize": 1853191744,
+  "unfree": false,
+  "generated": "2026-04-29T02:03:13Z"
+}
