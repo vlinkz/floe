@@ -75,11 +75,17 @@ jobs:
           ATTIC_ENDPOINT: ${{ vars.FLOE_CACHE_ENDPOINT }}
           ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
           ATTIC_TOKEN: ${{ secrets.FLOE_CACHE_TOKEN }}
+          CACHE_PUBLIC_URL: ${{ vars.FLOE_CACHE_PUBLIC_URL }}
+          CACHE_PUBLIC_KEY: ${{ vars.FLOE_CACHE_PUBLIC_KEY }}
         run: |
           nix profile install nixpkgs#attic-client
           echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
-          attic use "$ATTIC_CACHE"
+          mkdir -p ~/.config/nix
+          {
+            echo "extra-substituters = $CACHE_PUBLIC_URL"
+            echo "extra-trusted-public-keys = $CACHE_PUBLIC_KEY"
+          } >> ~/.config/nix/nix.conf
 
       - name: Snapshot store
         id: pre
