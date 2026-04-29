@@ -56,6 +56,12 @@ jobs:
           attic login --set-default "$ATTIC_CACHE" "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
           attic use "$ATTIC_CACHE"
 
+      - name: Snapshot store
+        id: pre
+        run: |
+          nix path-info --all > "$RUNNER_TEMP/store-before.txt"
+          echo "before=$RUNNER_TEMP/store-before.txt" >> "$GITHUB_OUTPUT"
+
       - name: Compute matrix
         id: matrix
         shell: bash
@@ -81,6 +87,21 @@ jobs:
           fi
           # GHA matrix `include` expects an array of objects.
           echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+
+      - name: Push new store paths to Attic
+        if: steps.cache.outputs.have_token == 'true'
+        env:
+          ATTIC_CACHE: ${{ vars.FLOE_CACHE_NAME }}
+          BEFORE: ${{ steps.pre.outputs.before }}
+        run: |
+          set -euo pipefail
+          new=$(comm -23 <(nix path-info --all | sort -u) <(sort -u "$BEFORE"))
+          if [[ -z "$new" ]]; then
+            echo "No new store paths to push."
+            exit 0
+          fi
+          # shellcheck disable=SC2086
+          attic push "$ATTIC_CACHE" $new
 
   build:
     name: Build ${{ matrix.app }} (${{ matrix.system }})
