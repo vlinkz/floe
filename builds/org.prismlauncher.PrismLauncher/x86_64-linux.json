@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "appId": "org.prismlauncher.PrismLauncher",
+  "mainProgram": "prismlauncher",
+  "system": "x86_64-linux",
+  "source": {
+    "kind": "flake",
+    "url": "github:PrismLauncher/PrismLauncher",
+    "lockedUrl": "github:PrismLauncher/PrismLauncher/9a9e8573aaac3b7b49d79aa0d0544b7913e4d84f?narHash=sha256-GvAfrZxQSlBnCJ59nvK87jDTVo60D8n25K42SokE1q8%3D",
+    "lockedRev": "9a9e8573aaac3b7b49d79aa0d0544b7913e4d84f"
+  },
+  "metadata": {
+    "componentType": "desktop-application",
+    "summary": "Custom Minecraft Launcher to easily manage multiple Minecraft installations at once",
+    "longDescription": "Prism Launcher is a custom launcher for Minecraft that focuses on predictability, long term stability and simplicity. Features: Easily install game modifications, such as Fabric, Forge and Quilt Easily install and update modpacks from the Launcher Control your Java settings, and enable Mangohud or Gamemode with a toggle Manage worlds and resource packs from the launcher See logs and other details easily through a dashboard Kill Minecraft in case of a crash/freeze Isolate Minecraft instances to keep everything clean Install and update mods directly from the launcher Customize the launcher with themes, and more And cat :3",
+    "homepage": "https://prismlauncher.org/",
+    "license": "GPL-3.0-only"
+  },
+  "attr": "packages.x86_64-linux.prismlauncher",
+  "version": "10.0-unstable-2026-04-12",
+  "storePath": "/nix/store/nmg3vas5xycic0gcclscln273dpcf0a2-prismlauncher-10.0-unstable-2026-04-12",
+  "narHash": "sha256-Cdy/gUHcqPCM0xxkkGX4+GEUq6KU+lfH1KZHWndcs7s=",
+  "closureSize": 2572878968,
+  "unfree": false,
+  "generated": "2026-04-29T01:39:14Z"
+}
