@@ -135,12 +135,10 @@ jobs:
           AWS_EC2_METADATA_DISABLED: true
         run: |
           mkdir -p "var/appstream/${{ matrix.system }}"
-          aws s3 sync \
-            --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
-            --exclude "catalogs/*" \
-            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/" \
-            "var/appstream/${{ matrix.system }}/" \
-            --no-progress
+          s5cmd --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
+            sync --exclude "catalogs/*" \
+            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/*" \
+            "var/appstream/${{ matrix.system }}/"
 
       - name: Run aggregator
         if: steps.filter.outputs.skip != 'true' && steps.appstream.outputs.have_credentials == 'true'
@@ -208,11 +206,9 @@ jobs:
           AWS_DEFAULT_REGION: auto
           AWS_EC2_METADATA_DISABLED: true
         run: |
-          aws s3 cp \
-            --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
-            "${{ steps.catalog.outputs.tarball }}" \
-            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/catalogs/${{ steps.catalog.outputs.tarball }}" \
-            --no-progress
+          s5cmd --endpoint-url "${{ vars.FLOE_APPSTREAM_S3_ENDPOINT }}" \
+            cp "${{ steps.catalog.outputs.tarball }}" \
+            "s3://${{ vars.FLOE_APPSTREAM_BUCKET }}/${{ matrix.system }}/catalogs/${{ steps.catalog.outputs.tarball }}"
 
       - name: Write appstream/<system>.json record
         if: >-

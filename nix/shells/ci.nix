@@ -8,7 +8,7 @@ pkgs.mkShellNoCC {
   packages = [
     floe-builder
     pkgs.attic-client
-    pkgs.awscli2
+    pkgs.s5cmd
     pkgs.jq
   ];
 }

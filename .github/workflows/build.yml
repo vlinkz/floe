@@ -248,12 +248,7 @@ jobs:
           SYSTEM: ${{ matrix.system }}
         run: |
           src="var/appstream/${SYSTEM}"
-          aws s3 cp \
-            --recursive \
-            --endpoint-url "$ENDPOINT" \
-            "$src/" \
-            "s3://${BUCKET}/${SYSTEM}/" \
-            --no-progress
+          s5cmd --endpoint-url "$ENDPOINT" cp "$src/*" "s3://${BUCKET}/${SYSTEM}/"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

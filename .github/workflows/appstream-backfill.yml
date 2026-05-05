@@ -138,12 +138,7 @@ jobs:
             echo "::warning::no slices generated for ${SYSTEM}"
             exit 0
           fi
-          aws s3 cp \
-            --recursive \
-            --endpoint-url "$ENDPOINT" \
-            "$src/" \
-            "s3://${BUCKET}/${SYSTEM}/" \
-            --no-progress
+          s5cmd --endpoint-url "$ENDPOINT" cp "$src/*" "s3://${BUCKET}/${SYSTEM}/"
 
       - name: Push new store paths to Attic
         if: steps.filter.outputs.skip != 'true' && steps.cache.outputs.have_token == 'true'
